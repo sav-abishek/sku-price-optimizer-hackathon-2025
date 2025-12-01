@@ -1,0 +1,279 @@
+
+
+--- Page 1 ---
+Hackathon 2025
+Problem Statement
+Evaluation KPIs
+Data Dictionary
+
+--- Page 2 ---
+2
+Submission Guidelines
+To ensure your submission is accepted without errors, please adhere to the following rules strictly:
+1. All column names in your submission must exactly match those in the provided submission template.
+2. Column names are case -sensitive, so ColumnName  and columnname  are considered different.
+3. The total number of rows in your submission must exactly match the number of rows in the submission template.
+4. Your submission must not contain any duplicate rows.
+5. All primary key columns from the submission template must be present in your submission.
+6. Ensure that all data types in your submission match the format in the template (e.g., numeric fields should not contain text) .
+7. Submit the file in the .csv format only
+
+--- Page 3 ---
+Pricing 
+Optimization
+
+
+--- Page 4 ---
+4
+Problem Statement
+Round 1 Price Elasticity Model
+1. Build a SKU elasticity model using ML or 
+statistical models to predict the impact on 
+volume due to price changes 
+2. Derive own and cross price elasticities and 
+analyze cannibalization.
+Round 2 Pricing Optimizer
+1. Build and optimization engine to find the 
+optimal prices for the SKUs in the portfolio 
+based on the PINC maximizing the MACO 
+(Margin OF Contribution) at the country level 
+using the Price Elasticity Model 
+2. Build an optimizer that can be integrated with 
+the BrewVision  tool
+3. Submit Github  repo for AI evaluation
+Build data -driven models to optimize portfolio pricing by understanding price elasticity and cannibalization —maximize MACO with 
+smarter pricing!
+
+--- Page 5 ---
+5
+Round 1 Price Elasticity
+Problem Statement
+Your task is to develop a statistical or machine learning model that quantifies the own -price  and cross -price elasticities  for our product portfolio in one of ABI’s market.
+• Own -Price Elasticity:  Model the change in volume for each product in response to a change in its own price. The model should reflect the expected m arket behavior of negative elasticity 
+(i.e., as price increases, volume decreases).
+• Cross -Price Elasticity:  Quantify how a change in the price of one product affects the demand for other products in the portfolio. Your model should i dentify and quantify cannibalization, 
+particularly between substitutable products (e.g., within the same brand, beer type, or similar pack sizes). We expect a posi tive cross -elasticity, indicating that an increase in the price of 
+one product drives an increase in demand for its substitutes.
+IMPORTANT : Your model must provide own -elasticity for each SKU in the data. Additionally, each of these SKUs should have cross -elasticiti es with at least 2 -3 other ABI SKUs and 1 -2 
+Competition (Non - ABI) SKUs.
+SKU Name Identifier  = CONCAT(Brand, Sub -brand, Package, Package Type, Capacity Number, “cc”)
+Deliverables
+Your submission for Round 1 must include:
+1. Volume Predictions: The output from your elasticity model for the volume prediction on the test data
+2. Elasticity Matrix:  Pairwise SKU own and cross price elasticities for all SKUs in the test data
+Evaluation Criteria
+1. Score = 0.25 * Adj R2 + 0.25 * wMAPE  + 0.5*Elasticity Adherence
+2. Elasticity Adherence Criteria:
+o Own Elasticity should be negative
+o Cross Elasticity should be positive
+o Every SKU should have cross elasticities for atleast  2 other ABI SKUs and 2 non -ABI SKUs
+
+--- Page 6 ---
+6
+Round 2 Pricing Optimizer (1/3)
+In this round, you'll leverage your elasticity matrix to create a powerful pricing optimizer . The goal is to move from analysis to action by designing a new pricing structure that maximizes our 
+Margin of Contribution (MACO) while adhering to key business constraints.
+Problem Statement
+Using the own and cross -price elasticities from Round 1, your task is to build a pricing optimization engine  that recommends an optimal set of prices for the entire product portfolio at a SKU  
+level for different PINCs (Price Increases) at a national level. The primary objective is to maximize the overall MACO  for the market.
+User Inputs
+The optimization must be performed on the full portfolio based on these user inputs :
+• A National PINC (Price Increase)  that needs to be reallocated across SKUs
+• Price Bounds:  Bounds for the recommended price changes at SKU level
+Example - 
+o MIN:  Current PTC (Price to Consumer) - 300
+o MAX:  Current PTC + 500
+Some important formulae:  
+o MACO = NR - VILC 
+o NR = NR/unit * Sales units 
+o Discount% = Discount/GTO
+o Excise% = Excise/GTO
+o NR/unit =(( PTC/(1+markup))*(1 -Discount% -Excise%) )/(1+VAT) [Assume VAT as 19%]
+o Sales unit = (volume * 100000)/ Pack Size
+o Target VILC = Base VILC (1+ VILC Growth Rate ) [Assume VILC Growth Rate as 3.78%]
+
+--- Page 7 ---
+7
+Round 2 Pricing Optimizer (2/3)
+Contraints
+Your optimizer must adhere to the following hard constraints :
+• Volume should change in accordance with the Industry Volume model: The final volume must be connected to the PCC model, using elasticities as inputs to determine the new volume 
+mix across the different products in the country. Total Industry Volume should not decline by more than 1%.
+o New Industry Volume = (1 -.56*price change) * Old Industry Volume
+• Financial Target:  The target MACO (model output) must be higher than the base MACO (current year).
+• Volume Target:  The target volume (model output) should not decrease by more than 1% or increase by more than 5% compared to the base volume (current year).
+• Total Price Increase (PINC):  The overall portfolio price increase can be between 0 -6%, based on a user -defined input.
+• Market Share:  ABI's market share should not drop by more than 0.5%.
+• Pricing Multiples:  All recommended price changes must be in multiples of 50.
+You must also consider soft constraints  to maintain brand hierarchy:
+• The Net Revenue per Hectoliter (NR/HL) of different segments must follow the established hierarchy: Value < Core < Core+ < Pr emium < Super Premium.
+• The NR/HL architecture of size groups must follow the hierarchy: Small > Regular > Large.
+▪Small: An SKU is considered small if the pack_size  is less than 300.
+▪Regular: An SKU is considered regular if its pack_type  is 'CAN' and its pack_size  is between 300 and 399 (inclusive), or if its pack_type  is 'RB' or 'NRB' and its pack_size  is 
+between 300 and 599 (inclusive).
+▪Large: An SKU is considered large if its pack_type  is 'CAN' and its pack_size  is greater than 399, or if its pack_type  is 'RB' or 'NRB' and its pack_size  is greater than 599.
+
+--- Page 8 ---
+8
+Round 2 Pricing Optimizer (3/3)
+Deliverables
+Your submission for Round 2 must include:
+1. Pricing Optimizer:  The operational code for your optimization model. The model should take the elasticity matrix and user inputs (like PINC targ et and Price Bounds) and output the optimal pricing 
+recommendations.
+2. Optimized Pricing Plan:  The final pricing recommendation plan and its impact. 
+o Overall Summary:   This table should clearly show the old price, new price, and the projected impact on key performance indicators (KPIs) , including:
+1. Volume
+2. Net Revenue (NR)
+3. NR per Hectoliter (NR/HL)
+4. MACO
+5. MACO per Hectoliter (MACO/HL)
+o SKU level pricing architecture: A visualization of the new and old prices across SKUs based on the recommendations from the optimizer for the user defined PI NC
+3. Build an optimizer  front -end feature that can be integrated with the BrewVision  tool
+Please note : Additional data for the Pricing Optimizer shall be shared after completion of Round1 
+
+--- Page 9 ---
+9
+Evaluation Criteria
+Round 1 Price Elasticity Model
+Score = 0.25 * Adj R2 + 0.25 * wMAPE  + 0.5*Elasticity 
+adherence
+Elasticity Adherence Criteria:
+•Own Elasticity should be negative
+•Cross Elasticity should be positive
+•Every SKU should have cross elasticities for 
+atleast  2 other ABI SKUs and 2 non -ABI SKUs 
+Round 2 Pricing Optimzier
+1. Adherence with the hard constraints
+2. Working dynamic visualization of the following :
+• Summary of PINC changes on the 
+financial KPIs
+• SKU Price Architecture – Dynamic 
+visualization of the old prices and the 
+recommended new prices at a SKU level
+• Github  Repo for AI evaluation
+
+--- Page 10 ---
+10
+Data Dictionary (1/2)
+Column Name Description
+•DATE Date of the record
+•MARKET Market or region name
+•MANUFACTURER Name of the manufacturer
+•BRAND Product brand
+•SUB_BRAND Sub-brand or variant
+•PACKAGE Type of package (e.g., bottle, can)
+•PACKAGE_TYPE Descriptor of packaging (e.g., RETORNABLE, NO RETORNABLE)
+•CAPACITY_NUMBER Capacity per unit (usually in ml)
+•SALES_VALUE Total sales value
+•SALES_HECTOLITERS Total sales in hectoliters
+•NUMERIC_DISTRIBUTION_STORES_HANDLING Number of stores handling the product
+•AVG_PRICE_PER_LITER Average price per liter
+•INVENTORY_HECTOLITERS Inventory in hectoliters
+•WEIGHTED_DISTRIBUTION_TDP_REACH Weighted distribution (e.g., Total Distribution Points Reach)
+Sellout Data
+
+--- Page 11 ---
+11
+Data Dictionary (2/2)
+Column Name Description
+•date Date of the observation or forecast
+•geography Geographical focus of the data
+•concept Description of the economic concept measured
+•historical_edge_date Date marking the edge of historical data
+•scale Scale of measurement (e.g., unit, thousand)
+•source Original data source
+•frequency Frequency of data (e.g., annual, monthly)
+•real_or_nominal Whether the value is real or nominal (inflation -adjusted or not)
+•value Numeric value of the data point
+•source_id Identifier from the source
+•bank_name Name of bank or financial institution providing data
+•adjustment_name Type of adjustment applied (if any)
+•base_period_name Name or label of the base period
+•base_period_end End date of the base period
+•base_period_start Start date of the base period
+•base_period_value Value during the base period
+•last_update Timestamp of last data update
+•actual_or_forecast Indicates if the value is actual or forecast
+•__insert_gmt_ts GMT timestamp of data insertion
+•__update_gmt_ts GMT timestamp of last update
+IHS – Macroeconomic Data
+
+--- Page 12 ---
+2. Long Term Equity
+
+--- Page 13 ---
+13
+Long Term Equity
+Round 1
+1.Predict Brand Power
+2.Clear articulation of how long it takes for each of the 
+marketing actions to reflect in PowerRound 2
+1. Optimize Marketing Investments to drive Power
+2. Develop an interactive simulator tool for Power
+3. Integrate a GenAI  chatbot layer that explains results in 
+simple, business -friendly language (Good to have)
+4. Submit Github  repo for AI evaluationBackground
+Brand Power is a leading indicator of market share and a growing strategic metric, with many teams already setting Power targ ets. Today, most marketing is 
+optimized for short -term sales, but sales alone don’t reflect brand health. This exercise shifts focus to long -term equity - understanding how marketing builds 
+Brand Power and how long it takes to show measurable impact. The goal is to guide smarter investments that drive both sales and sustainable brand strength.Problem Statement
+Analyse  the long -term impact of marketing activities on Brand Power
+
+--- Page 14 ---
+14
+Evaluation KPI
+Round1
+Power Prediction Score (PPS) = 0.5 * RMSE Skill Score + 0.5 * Trend Hit Rate
+where:
+ RMSE Skill Score = max ( 0, min ( 1, 1 -𝑅𝑀𝑆𝐸
+𝜎𝑌 )) ; 
+ Trend Hit Rate = #cases ( ∆Y = ∆෠𝑌)/#cases total
+Round2
+For Optimization: Power uplift w.r.t.  baseline power
+For Simulation:
+1. Accuracy of predictions - When inputs are changed, do the simulated Power values stay 
+consistent with model outputs?
+2. Do the simulated outcomes make business sense?
+3. Does the simulator offer an optimal mix recommendation in addition to manual scenario 
+testing?Round2
+Optimization Goal: The goal for 
+optimization is to drive power growth 
+using the best marketing allocations
+Constraints: 
+1. Digital cannot be 100%
+2. TV cannot be more than 50% of 
+the total mix
+
+--- Page 15 ---
+15
+Data Dictionary – Brand Guidance
+BG Column Description Comment
+Country Name of the country
+Brand Name of the brand. It can be ABI or Competitor
+PowerPrediction of volume share a brand can command based on consumer predisposition to choose the 
+brand over othersWithin a market, all brand power sums 
+to 100
+Meaning Extent to which brands build an emotional connection and are seen to deliver against functional needs Indexed at 100
+DifferenceExtent to which brands set themselves apart from the category by offering something others don't and by 
+leading the wayIndexed at 100
+Salience How quickly and easily the brand comes to mind Indexed at 100
+PremiumPrediction of price index a brand can support based on consumer predisposition to pay more for the 
+brand than for othersIndexed at 1
+
+--- Page 16 ---
+Data Dictionary - Marketing
+S.No . Data Set Details
+1 Sell-in NR, MACO, VOL, discounts, GTO
+2 Sell-out Data National and Regional PTC trend, Price Index vs Competitor
+3 Distribution Simple / Average / Multiple Distribution / TDP / Weighted Distribution etc.
+4 Promotions Calendar / PINC Any branded promotion, PINC calendar by brand
+5 Media Investments Example - Facebook, OpenTV, Print, Radio etc.
+6 All other Marketing investments Sponsorship, Experiential
+7 Sales Investments Contracts, Trand off
+8 Macroeconomics Income, Unemployment rate, Inflation, etc.
+9 Weather Temperature, Precipitation
+10 Holidays Key holidays / festivals
+11 Demographics Total population trends, income groups, age groups, ethnicity, etc.
+12 FX rate –
+13 Mapping files For mapping Brand to PTC, Investments to Marketing or Sales
+More detailed Data Dictionary: Data_Dictionary  - latest.xlsx
+If feasible can keep/attach this. Else the above table is fine.

@@ -1,0 +1,398 @@
+@st.cache_data(show_spinner=False)
+def cached_optimize(pinc_target: float, floor_delta: float, ceiling_delta: float, price_step: float):
+    return run_optimizer(
+        pinc_target=pinc_target,
+        price_floor_delta=floor_delta,
+        price_ceiling_delta=ceiling_delta,
+        price_step=price_step,
+    )
+
+
+def df_to_csv_bytes(df: pd.DataFrame) -> bytes:
+    with io.StringIO() as buffer:
+        df.to_csv(buffer, index=False)
+        return buffer.getvalue().encode("utf-8")
+
+
+def billions(value: float) -> str:
+    # Display all currency values in millions (M)
+    try:
+        v = float(value)
+    except Exception:
+        return str(value)
+    return f"{v/1e6:,.2f} M"
+
+
+def growth_badge(delta: float) -> str:
+    if delta >= 0:
+        return f"<span style='color:#1b7a1b;'>▲ {delta:.2%}</span>"
+    return f"<span style='color:#c0392b;'>▼ {abs(delta):.2%}</span>"
+
+
+def sorted_unique(series: pd.Series) -> List[str]:
+    values: List[str] = []
+    for val in series.dropna():
+        text = str(val).strip()
+        if text and text.lower() != "nan":
+            values.append(text)
+    return sorted(set(values))
+
+
+def dropdown_multiselect(label: str, options: List[str]) -> List[str]:
+    safe_label = label.lower().replace(" ", "_")
+    selection_key = f"{safe_label}_selection"
+    select_all_key = f"{selection_key}_all"
+
+    if selection_key not in st.session_state:
+        st.session_state[selection_key] = options.copy()
+    current = st.session_state[selection_key]
+
+    if not current or len(current) == len(options):
+        summary = "All selected"
+    elif len(current) == 1:
+        summary = current[0]
+    elif len(current) == 2:
+        summary = ", ".join(current)
+    else:
+        summary = ", ".join(current[:2]) + f" +{len(current) - 2}"
+    button_label = f"{label}: {summary}"
+
+    with st.popover(button_label):
+        select_all_default = len(current) == len(options)
+        select_all = st.checkbox("Select all", key=select_all_key, value=select_all_default)
+
+        if select_all:
+            st.session_state[selection_key] = options.copy()
+            for opt in options:
+                st.session_state[f"{selection_key}_{opt}"] = True
+        new_selection: List[str] = []
+        for opt in options:
+            opt_key = f"{selection_key}_{opt}"
+            st.session_state.setdefault(opt_key, opt in current or select_all)
+            checked = st.checkbox(opt, key=opt_key)
+            if checked:
+                new_selection.append(opt)
+        st.session_state[selection_key] = new_selection or options.copy()
+
+    return st.session_state[selection_key]
+
+
+def price_delta_color(value: float) -> str:
+    if value > 0:
+        return "background-color: #e6f5e6; color: #1b7a1b; font-weight:600;"
+    if value < 0:
+        return "background-color: #ffeaea; color:#c0392b; font-weight:600;"
+    return ""
+
+
+def render_scenario_card(name: str, portfolio: pd.DataFrame, metadata: Dict) -> None:
+    st.markdown(f"**Scenario:** {name}")
+    cols = st.columns(3)
+    maco_delta = portfolio.loc[portfolio["metric"] == "MACO", "delta"].iloc[0]
+    nr_delta = portfolio.loc[portfolio["metric"] == "Net Revenue", "delta"].iloc[0]
+    pinc_value = metadata.get("pinc_actual", 0)
+    cols[0].metric("MACO delta", f"{maco_delta:,.0f}")
+    cols[1].metric("NR delta", f"{nr_delta:,.0f}")
+    cols[2].metric("PINC", f"{pinc_value:.3%}")
+
+
+st.markdown(
+    """
+    <div class="hero-card">
+        <div class="hero-eyebrow">Revenue Growth Management</div>
+        <h1 class="hero-title">Dynamic Pricing <span>Studio</span></h1>
+        <p class="hero-subtitle">
+            Allocate national PINC targets across ABI's portfolio, simulate trade-offs instantly, and export
+            recommendations ready for BrewVision hand-off.
+        </p>
+        <div class="hero-accent"></div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+st.markdown("")
+
+with st.sidebar:
+    st.image("static/logo.png", width=160)
+    st.markdown(
+        "<div style='font-size:1.2rem;font-weight:700;margin-top:1rem;margin-bottom:0.25rem;'>Optimization Inputs</div>",
+        unsafe_allow_html=True,
+    )
+    st.caption("Adjust national stretch targets and list-price guardrails before running the optimizer.")
+
+    pinc = st.slider("National PINC", min_value=0.0, max_value=0.06, value=0.02, step=0.005, format="%.3f")
+    floor_delta = st.number_input("Price floor delta", value=-300.0, step=50.0, help="Lower bound vs. current PTC")
+    ceiling_delta = st.number_input("Price ceiling delta", value=500.0, step=50.0, help="Upper bound vs. current PTC")
+    price_step = st.number_input(
+        "Price step (multiples of)", value=50.0, min_value=1.0, step=1.0, help="Rounded PTC increments"
+    )
+    run_clicked = st.button("Run Optimization")
+
+if "current_result" not in st.session_state or run_clicked:
+    with st.spinner("Running optimizer..."):
+        st.session_state["current_result"] = cached_optimize(pinc, floor_delta, ceiling_delta, price_step)
+
+result = st.session_state["current_result"]
+summary_df: pd.DataFrame = result["summary"].copy()
+portfolio_df: pd.DataFrame = result["portfolio"].copy()
+architecture_df: pd.DataFrame = result["architecture"].copy()
+metadata = result["metadata"]
+constraints = result.get("constraints", {})
+
+# Render right-side assistant now that context is available
+render_insights_assistant()
+
+if not metadata.get("success", False):
+    st.warning(f"Optimizer returned a baseline scenario. Reason: {metadata.get('status', 'infeasible constraints')}")  # noqa: E501
+
+st.markdown(
+    f"<h2 style='color:{BRAND_COLORS['black']};margin-bottom:0.25rem;'>Portfolio <span class='accent'>Impact</span></h2>",
+    unsafe_allow_html=True,
+)
+
+portfolio_display = portfolio_df.copy()
+if {"base", "new"}.issubset(portfolio_display.columns):
+    portfolio_display["delta"] = portfolio_display["new"] - portfolio_display["base"]
+
+maco_new = portfolio_df.loc[portfolio_df["metric"] == "MACO", "new"].iloc[0]
+nr_new = portfolio_df.loc[portfolio_df["metric"] == "Net Revenue", "new"].iloc[0]
+maco_base = portfolio_df.loc[portfolio_df["metric"] == "MACO", "base"].iloc[0]
+nr_base = portfolio_df.loc[portfolio_df["metric"] == "Net Revenue", "base"].iloc[0]
+pinc_actual = metadata.get("pinc_actual", 0)
+iterations = metadata.get("iterations")
+
+kpi_cards = f"""
+<div class="kpi-row">
+    <div class="kpi-card">
+        <h4>MACO</h4>
+        <div class="value">{billions(maco_new)}</div>
+        <div class="delta">Baseline {billions(maco_base)} &nbsp; {growth_badge((maco_new - maco_base) / max(maco_base, 1e-6))}</div>
+    </div>
+    <div class="kpi-card">
+        <h4>Net Revenue</h4>
+        <div class="value">{billions(nr_new)}</div>
+        <div class="delta">Baseline {billions(nr_base)} &nbsp; {growth_badge((nr_new - nr_base) / max(nr_base, 1e-6))}</div>
+    </div>
+    <div class="kpi-card">
+        <h4>Portfolio PINC</h4>
+        <div class="value">{pinc_actual:.3%}</div>
+        <div class="delta">Target {pinc:.3%}</div>
+    </div>
+    <div class="kpi-card">
+        <h4>Solver Iterations</h4>
+        <div class="value">{iterations if iterations is not None else '-'}</div>
+        <div class="delta">Post-constraint scaling</div>
+    </div>
+</div>
+"""
+st.markdown(kpi_cards, unsafe_allow_html=True)
+
+st.dataframe(portfolio_display, width="stretch", hide_index=True)
+
+tab_recos, tab_mapping = st.tabs(["SKU Recommendations", "Sell-in / Sell-out Mapping"])
+
+with tab_recos:
+    st.markdown(
+        f"<div class='section-header'>SKU Recommendations<span></span></div>",
+        unsafe_allow_html=True,
+    )
+
+    summary_df["brand"] = summary_df["brand"].astype(str)
+    summary_df["pack"] = summary_df["pack"].astype(str)
+    summary_df["segment"] = summary_df["segment"].astype(str)
+    # Ensure Arrow compatibility for text-like identifiers
+    if "size" in summary_df.columns:
+        summary_df["size"] = summary_df["size"].astype(str)
+    if "size_group" in summary_df.columns:
+        summary_df["size_group"] = summary_df["size_group"].astype(str)
+
+    brands = sorted_unique(summary_df["brand"])
+    packs = sorted_unique(summary_df["pack"])
+    segments = sorted_unique(summary_df["segment"])
+
+    filter_cols = st.columns(3)
+    with filter_cols[0]:
+        st.markdown("<div class='filter-label'>Select brand(s)</div>", unsafe_allow_html=True)
+        selected_brands = dropdown_multiselect("Brand", brands)
+    with filter_cols[1]:
+        st.markdown("<div class='filter-label'>Select pack / SKU</div>", unsafe_allow_html=True)
+        selected_packs = dropdown_multiselect("Pack", packs)
+    with filter_cols[2]:
+        st.markdown("<div class='filter-label'>Select segment</div>", unsafe_allow_html=True)
+        selected_segments = dropdown_multiselect("Segment", segments)
+
+    filtered = summary_df[
+        summary_df["brand"].isin(selected_brands)
+        & summary_df["pack"].isin(selected_packs)
+        & summary_df["segment"].isin(selected_segments)
+    ].copy()
+    filtered["volume_delta"] = filtered["volume_new"] - filtered["volume_base"]
+    filtered["nr_delta"] = filtered["nr_new"] - filtered["nr_base"]
+    filtered["maco_delta"] = filtered["maco_new"] - filtered["maco_base"]
+    filtered["price_delta"] = filtered["price_new"] - filtered["price_base"]
+
+    styled = filtered.style.applymap(price_delta_color, subset=["price_delta"])
+    st.dataframe(styled, width="stretch", hide_index=True)
+
+    download_cols = st.columns(3)
+    download_cols[0].download_button(
+        "Download SKU Plan",
+        data=df_to_csv_bytes(summary_df),
+        file_name="optimized_prices.csv",
+        mime="text/csv",
+    )
+    download_cols[1].download_button(
+        "Download Portfolio Summary",
+        data=df_to_csv_bytes(portfolio_df),
+        file_name="portfolio_summary.csv",
+        mime="text/csv",
+    )
+    download_cols[2].download_button(
+        "Download Price Architecture",
+        data=df_to_csv_bytes(architecture_df),
+        file_name="price_architecture.csv",
+        mime="text/csv",
+    )
+
+    st.markdown("### Price Architecture View")
+    architecture_long = architecture_df.melt(
+        id_vars=["brand", "pack", "size", "segment", "size_group"],
+        value_vars=["price_base", "price_new"],
+        var_name="price_type",
+        value_name="price",
+    )
+    architecture_long["price_type"] = architecture_long["price_type"].map(
+        {"price_base": "Current PTC", "price_new": "Recommended PTC"}
+    )
+    fig = px.bar(
+        architecture_long,
+        x="brand",
+        y="price",
+        color="price_type",
+        barmode="group",
+        hover_data=["pack", "size"],
+        title="SKU Price Architecture",
+    )
+    fig.update_layout(xaxis_title="Brand", yaxis_title="PTC")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown(
+        f"<h3 style='color:{BRAND_COLORS['black']};margin-top:2.5rem;'>Guardrails</h3>",
+        unsafe_allow_html=True,
+    )
+
+    maco_delta = float(constraints.get("maco_delta", 0.0))
+    volume_ratio = float(constraints.get("volume_ratio", 1.0))
+    industry_ratio = float(constraints.get("industry_ratio", 1.0))
+    market_share_actual = float(constraints.get("market_share", metadata.get("base_market_share", 0.0)))
+    share_drop = float(constraints.get("share_drop", 0.0))
+    pinc_actual_guard = float(constraints.get("pinc_actual", metadata.get("pinc_actual", 0.0)))
+    base_share = float(metadata.get("base_market_share", 0.0))
+
+    guardrail_cards = f"""
+    <div class="kpi-row" style="margin-top:0.5rem;">
+        <div class="kpi-card">
+            <h4>MACO Delta</h4>
+            <div class="value">{billions(maco_delta)}</div>
+            <div class="delta">Must be non-negative</div>
+        </div>
+        <div class="kpi-card">
+            <h4>ABI Volume</h4>
+            <div class="value">{volume_ratio:.2%}</div>
+            <div class="delta">Guardrail: -1% to +5%</div>
+        </div>
+        <div class="kpi-card">
+            <h4>Industry Volume</h4>
+            <div class="value">{industry_ratio:.2%}</div>
+            <div class="delta">Guardrail: ≥ 99%</div>
+        </div>
+        <div class="kpi-card">
+            <h4>Market Share</h4>
+            <div class="value">{market_share_actual:.2%}</div>
+            <div class="delta">Baseline {base_share:.2%}</div>
+        </div>
+    </div>
+    """
+    st.markdown(guardrail_cards, unsafe_allow_html=True)
+
+    secondary_guardrail_cards = f"""
+    <div class="kpi-row" style="margin-top:0.5rem;">
+        <div class="kpi-card">
+            <h4>Share Drop vs. Base</h4>
+            <div class="value">{share_drop:.2%}</div>
+            <div class="delta">Guardrail: ≤ 0.5%</div>
+        </div>
+        <div class="kpi-card">
+            <h4>Portfolio PINC</h4>
+            <div class="value">{pinc_actual_guard:.3%}</div>
+            <div class="delta">Target {pinc:.3%}</div>
+        </div>
+    </div>
+    """
+    st.markdown(secondary_guardrail_cards, unsafe_allow_html=True)
+
+    left, right = st.columns(2)
+    with left:
+        st.caption("NR/HL by Segment")
+        segment_df = pd.DataFrame([constraints.get("segment_nr_hl", {})]).T.reset_index()
+        segment_df.columns = ["segment", "nr_per_hl"]
+        st.dataframe(segment_df, hide_index=True, width="stretch")
+    with right:
+        st.caption("NR/HL by Size Group")
+        size_df = pd.DataFrame([constraints.get("size_group_nr_hl", {})]).T.reset_index()
+        size_df.columns = ["size_group", "nr_per_hl"]
+        st.dataframe(size_df, hide_index=True, width="stretch")
+        st.caption("Hierarchy check: Value < Core < Premium and Small > Regular > Large.")
+
+    st.markdown("### Scenario Workspace")
+    scenario_name = st.text_input("Scenario name")
+    if "scenarios" not in st.session_state:
+        st.session_state["scenarios"] = []
+
+    if st.button("Save Scenario", key="save_scenario") and scenario_name:
+        st.session_state["scenarios"].append(
+            {
+                "name": scenario_name,
+                "portfolio": portfolio_display.copy(),
+                "metadata": metadata.copy(),
+            }
+        )
+        st.success(f"Scenario '{scenario_name}' saved.")
+
+    if st.session_state["scenarios"]:
+        for scenario in st.session_state["scenarios"]:
+            render_scenario_card(scenario["name"], scenario["portfolio"], scenario["metadata"])
+
+with tab_mapping:
+    st.markdown(
+        f"<div class='section-header'>Sell-in / Sell-out Mapping<span></span></div>",
+        unsafe_allow_html=True,
+    )
+    mapping_path = Path("outputs/round2/sellout_sellin_mapping.xlsx")
+    if mapping_path.exists():
+        mapping_df = pd.read_excel(mapping_path)
+        # Ensure Arrow compatibility: cast object columns to string
+        for c in mapping_df.select_dtypes(include=["object"]).columns:
+            mapping_df[c] = mapping_df[c].astype(str)
+        st.caption(
+            "Slugified brand, pack, and size tokens bridge Sell-out SKUs to Sell-in keys. Sample below (first 500 rows)."
+        )
+        st.dataframe(mapping_df.head(500), width="stretch", hide_index=True)
+        st.download_button(
+            "Download full mapping",
+            data=df_to_csv_bytes(mapping_df),
+            file_name="sellout_sellin_mapping.csv",
+            mime="text/csv",
+        )
+    else:
+        st.info("Mapping file not found. Run the optimizer to regenerate `sellout_sellin_mapping.xlsx`.")
+
+
+st.markdown("----")
+st.markdown(
+    f"<p style='color:{BRAND_COLORS['black']};opacity:0.8;'>Tip: expose this optimizer via the FastAPI service "
+    "<code>uvicorn src.api:app --reload</code> or run the Streamlit app locally with "
+    "<code>streamlit run streamlit_app.py</code>.</p>",
+    unsafe_allow_html=True,
+)
+

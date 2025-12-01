@@ -1,0 +1,408 @@
+import io
+import sys
+from pathlib import Path
+from typing import Dict, List
+
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
+PROJECT_SRC = Path(__file__).resolve().parent / "src"
+if str(PROJECT_SRC) not in sys.path:
+    sys.path.append(str(PROJECT_SRC))
+
+from optimizer import run_optimizer  # noqa: E402
+
+
+st.set_page_config(
+    page_title="Hackathon 2025 - Pricing Optimizer",
+    layout="wide",
+    page_icon="static/logo.png",
+    initial_sidebar_state="expanded",
+)
+
+BRAND_COLORS = {
+    "black": "#000000",
+    "primary": "#f5e003",
+    "white": "#ffffff",
+    "accent": "#e5b611",
+    "secondary": "#d1a33c",
+    "muted": "#c7c7c7",
+        }
+
+st.markdown(
+    f"""
+    <style>
+        :root {{
+            --brand-black: {BRAND_COLORS["black"]};
+            --brand-primary: {BRAND_COLORS["primary"]};
+            --brand-accent: {BRAND_COLORS["accent"]};
+        }}
+        header[data-testid="stHeader"] {{
+            display: none;
+        }}
+        .stApp {{
+            background: linear-gradient(180deg, #ffffff 0%, #fffdf4 72%);
+            color: var(--brand-black);
+            font-family: 'Outfit', 'Segoe UI', sans-serif;
+        }}
+        .block-container {{
+            padding-top: 0.75rem;
+            padding-bottom: 1.0rem;
+            max-width: 1200px;
+        }}
+        [data-testid="stSidebar"] {{
+            background: linear-gradient(180deg, #161616 0%, #111111 45%, #080808 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+            color: #f5f5f5;
+            padding: 2.2rem 1.6rem 2.4rem 1.6rem;
+        }}
+        [data-testid="stSidebar"] * {{
+            color: #f5f5f5 !important;
+        }}
+        [data-testid="stSidebar"] img {{
+            display: block;
+            margin: 0 auto 1.2rem auto;
+        }}
+        [data-testid="stSidebar"] div[data-baseweb="slider"] > div {{
+            padding-top: 0.4rem;
+            padding-bottom: 0.8rem;
+        }}
+        [data-testid="stSidebar"] .stSlider [data-testid="stTickBar"] {{
+            background: rgba(255, 255, 255, 0.22);
+            height: 6px;
+            border-radius: 999px;
+        }}
+        [data-testid="stSidebar"] .stSlider [data-testid="stTickBar"] > div {{
+            background: linear-gradient(90deg, #f5e003 0%, #f0bc00 100%);
+            border-radius: 999px;
+            height: 6px;
+        }}
+        [data-testid="stSidebar"] div[data-baseweb="input"] > div {{
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: #1f1f1f;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+        }}
+        [data-testid="stSidebar"] div[data-baseweb="input"]:hover > div,
+        [data-testid="stSidebar"] div[data-baseweb="input"]:focus-within > div {{
+            border-color: rgba(245, 224, 3, 0.7);
+            box-shadow: 0 0 0 2px rgba(245, 224, 3, 0.22);
+        }}
+        [data-testid="stSidebar"] div[data-baseweb="input"] input {{
+            color: #f5f5f5 !important;
+        }}
+        [data-testid="stSidebar"] div[data-baseweb="input"] button {{
+            background: #2a2a2a;
+            color: {BRAND_COLORS["primary"]};
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.16);
+        }}
+        [data-testid="stSidebar"] div[data-baseweb="input"] button:hover {{
+            background: #353535;
+        }}
+        [data-testid="stSidebar"] div[data-baseweb="input"] button svg {{
+            fill: {BRAND_COLORS["primary"]};
+        }}
+        [data-testid="stSidebar"] .stButton button {{
+            background: linear-gradient(120deg, #f6da2e 0%, #f5e003 45%, #f0bc00 100%);
+            color: var(--brand-black);
+            border-radius: 32px;
+            border: none;
+            font-weight: 700;
+            padding: 0.6rem 1.6rem;
+            box-shadow: 0 14px 28px rgba(245, 224, 3, 0.35);
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }}
+        [data-testid="stSidebar"] .stButton button:hover {{
+            transform: translateY(-1px);
+            box-shadow: 0 18px 30px rgba(224, 182, 0, 0.45);
+        }}
+        [data-testid="stSidebar"] .stButton button:active {{
+            transform: translateY(0);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+        }}
+        .headline {{
+            font-size: 2.6rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.35rem;
+            color: var(--brand-black);
+        }}
+        .headline .accent {{
+            color: var(--brand-primary);
+        }}
+        .subheadline {{
+            color: #595959;
+            font-size: 1.05rem;
+            max-width: 900px;
+        }}
+        .section-label {{
+            color: {BRAND_COLORS["secondary"]};
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            font-size: 0.74rem;
+            font-weight: 700;
+        }}
+        .kpi-row {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.1rem;
+            margin: 0.25rem 0 0.55rem 0;
+        }}
+        .kpi-card {{
+            background: #ffffff;
+            border-radius: 18px;
+            border: 1px solid #ebebeb;
+            box-shadow: 0 14px 24px rgba(0, 0, 0, 0.05);
+            padding: 12px 16px;
+        }}
+        .kpi-card h4 {{
+            margin: 0;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #6b6b6b;
+        }}
+        .kpi-card .value {{
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--brand-black);
+            margin-top: 0.2rem;
+        }}
+        .kpi-card .delta {{
+            font-size: 0.88rem;
+            color: #606060;
+            margin-top: 0.15rem;
+        }}
+        .kpi-card .delta span {{
+            font-weight: 600;
+        }}
+        .stMarkdown h2, .stMarkdown h3 {{
+            color: var(--brand-black) !important;
+        }}
+        h2 span.accent {{
+            color: var(--brand-primary);
+        }}
+        .stDataFrame, .stTable {{
+            border-radius: 18px;
+            border: 1px solid #ededed;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.05);
+        }}
+        .stDownloadButton button {{
+            background: {BRAND_COLORS["secondary"]};
+            color: var(--brand-black);
+            border-radius: 22px;
+            border: none;
+            font-weight: 600;
+            padding: 0.45rem 1.25rem;
+            box-shadow: 0 10px 18px rgba(0, 0, 0, 0.12);
+        }}
+        .stDownloadButton button:hover {{
+            background: {BRAND_COLORS["accent"]};
+        }}
+        .stTabs [role="tablist"] {{
+            gap: 0.5rem;
+        }}
+        .stTabs [role="tab"] {{
+            background: #f8f8f8;
+            border-radius: 18px;
+            padding: 0.45rem 1.3rem;
+            font-weight: 600;
+            border: 1px solid transparent;
+            color: #5c5c5c;
+        }}
+        .stTabs [aria-selected="true"] {{
+            background: linear-gradient(120deg, #fdf1a1 0%, #f5e003 90%);
+            color: var(--brand-black);
+            border-color: rgba(229, 182, 17, 0.4);
+            box-shadow: 0 6px 18px rgba(229, 182, 17, 0.35);
+        }}
+        .section-header {{
+            font-size: 1.9rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--brand-black);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-top: 1.2rem;
+            margin-bottom: 0.7rem;
+        }}
+        .section-header span {{
+            background: linear-gradient(90deg, {BRAND_COLORS["primary"]} 0%, {BRAND_COLORS["accent"]} 100%);
+            height: 6px;
+            width: 60px;
+            border-radius: 999px;
+            display: inline-block;
+        }}
+        .filter-label {{
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #7a7a7a;
+            margin-bottom: 0.35rem;
+        }}
+        div[data-baseweb="select"] > div {{
+            border-radius: 18px;
+            border: 1px solid #d9d9d9;
+            min-height: 50px;
+            padding: 0 12px;
+            color: var(--brand-black);
+            background-color: #ffffff;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+        }}
+        div[data-baseweb="select"]:hover > div {{
+            border-color: rgba(229, 182, 17, 0.6);
+            box-shadow: 0 0 0 2px rgba(245,224,3,0.2);
+        }}
+        div[data-baseweb="select"] span[data-baseweb="tag"] {{
+            background: rgba(245,224,3,0.2);
+            color: var(--brand-black);
+        }}
+        div[data-testid="stPopover"] button {{
+            width: 100%;
+            justify-content: space-between;
+            background: #fafafa !important;
+            border: 1px solid #e0e0e0 !important;
+            border-radius: 14px !important;
+            color: #2d2d2d !important;
+            font-weight: 600;
+            padding: 0.55rem 0.9rem;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);
+        }}
+        div[data-testid="stPopover"] button:hover {{
+            border-color: rgba(229, 182, 17, 0.65) !important;
+            box-shadow: 0 0 0 2px rgba(245,224,3,0.18);
+        }}
+        div[data-testid="stPopover"] button span {{
+            color: #2d2d2d !important;
+        }}
+        div[data-baseweb="popover"] [data-testid="stCheckbox"] label {{
+            color: var(--brand-black) !important;
+        }}
+        .hero-card {{
+            background: linear-gradient(135deg, #141414 0%, #1d1d1d 60%, #2c2c2c 100%);
+            border-radius: 28px;
+            padding: 0.9rem 1.6rem;
+            color: #ffffff;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.24);
+            margin-bottom: 0.65rem;
+            position: relative;
+            overflow: hidden;
+        }}
+        .hero-card::after {{
+            content: "";
+            position: absolute;
+            right: -55px;
+            top: -55px;
+            width: 180px;
+            height: 180px;
+            background: radial-gradient(circle at center, rgba(245,224,3,0.45), rgba(245,224,3,0));
+        }}
+        .hero-eyebrow {{
+            text-transform: uppercase;
+            letter-spacing: 0.22em;
+            font-size: 0.72rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 0.5rem;
+        }}
+        .hero-title {{
+            font-size: 2.05rem;
+            font-weight: 700;
+            letter-spacing: -0.015em;
+            margin: 0;
+        }}
+        .hero-title span {{
+            color: {BRAND_COLORS["primary"]};
+        }}
+        .hero-subtitle {{
+            margin-top: 0.6rem;
+            max-width: 650px;
+            font-size: 0.95rem;
+            line-height: 1.38;
+            color: rgba(255, 255, 255, 0.78);
+        }}
+        .hero-accent {{
+            margin-top: 0.9rem;
+            width: 120px;
+            height: 3px;
+            background: linear-gradient(90deg, {BRAND_COLORS["primary"]} 0%, {BRAND_COLORS["accent"]} 100%);
+            border-radius: 999px;
+        }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+def render_insights_assistant():
+    # Session state for assistant
+    if "assistant_messages" not in st.session_state:
+        st.session_state["assistant_messages"] = [
+            {
+                "role": "assistant",
+                "content": (
+                    "Hi! I’m your pricing insights assistant. This is a placeholder chat — "
+                    "no GenAI is called yet. Ask about PINC, MACO, volume, or guardrails."
+                ),
+            }
+        ]
+
+    st.markdown(
+        """
+        <style>
+          .assistant-card { background:#fff; border:1px solid #ebebeb; border-radius:16px; padding:10px 12px; box-shadow:0 10px 18px rgba(0,0,0,.04); margin-bottom:8px; }
+          .assistant-user { color:#202020; }
+          .assistant-bot { color:#333333; }
+          .assistant-meta { font-size:12px; color:#6b6b6b; margin-bottom:6px; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Anchor a popover to a right-aligned button
+    cols = st.columns([6, 1])
+    with cols[1]:
+        with st.popover("Insights", use_container_width=True):
+            # Safe access to current context
+            md = globals().get("metadata", {}) or {}
+            pf = globals().get("portfolio_df", pd.DataFrame())
+            pinc_actual = float(md.get("pinc_actual", 0.0))
+            try:
+                maco_row = pf.loc[pf["metric"] == "MACO"].iloc[0]
+                nr_row = pf.loc[pf["metric"] == "Net Revenue"].iloc[0]
+                maco_delta = float(maco_row.get("new", 0.0) - maco_row.get("base", 0.0))
+                nr_delta = float(nr_row.get("new", 0.0) - nr_row.get("base", 0.0))
+            except Exception:
+                maco_delta = 0.0
+                nr_delta = 0.0
+            st.markdown(
+                f"<div class='assistant-meta'>PINC {pinc_actual:.2%} | MACO Δ {billions(maco_delta)} | NR Δ {billions(nr_delta)}</div>",
+                unsafe_allow_html=True,
+            )
+
+            # Render chat history
+            for msg in st.session_state["assistant_messages"]:
+                role_cls = "assistant-user" if msg["role"] == "user" else "assistant-bot"
+                st.markdown(
+                    f"<div class='assistant-card {role_cls}'>{msg['content']}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            # Simple input form
+            with st.form("assistant_form", clear_on_submit=True):
+                q = st.text_input(
+                    "Ask for insights",
+                    placeholder="e.g., How can I improve MACO while keeping volume within +5%?",
+                )
+                submitted = st.form_submit_button("Send")
+                if submitted and q:
+                    st.session_state["assistant_messages"].append({"role": "user", "content": q})
+                    st.session_state["assistant_messages"].append({
+                        "role": "assistant",
+                        "content": (
+                            "Placeholder: I’d look at reallocating PINC toward inelastic SKUs, "
+                            "try alternative 50‑COP step mixes, and verify segment/size ladders."
+                        ),
+                    })
+

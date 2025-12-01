@@ -1,0 +1,178 @@
+Please ensure all of you are part of the round 2 teams’ channel for seamless communication  
+Round 2 Expectation  Summary :  
+RGM : 
+Optimize SKU prices for maximizing MACO  (Margin of Contribution)  
+Teams are expected to build an optimization engine which can find the optimal prices for market’s 
+full portfolio i.e. at SKU level  maximizing the national MACO adhering to the hard and soft 
+constraints. This should be delivered along with a front-end ie a web app which can take Revenue 
+Managers ’ input for Price Increase (PINC - usually between 0-6% on the entire portfolio ) & Price 
+Bounds (eg. You can only change the price of the SKU in the range PTC of SKU  +/ - 300) using the 
+optimization engine in the backend to recommend the optimal price/SKU . 
+Use the unmasked data provided to get closer to the insights  
+There is additional data available for RGM  
+ 
+Constraints:  
+ 
+Your optimizer must adhere to the following hard constraints : 
+1. Volume should change in accordance with the Industry Volume model: The final volume 
+must be connected to the Industry model, using elasticities as inputs to determine the new   
+volume mix across the different products in the country. Total Industry Volume should not 
+decline by more than 1%.  
+a. New Industry Volume = (1 -.56*price change) * Old Industry Volume   
+2. Financial Target:  The target MACO (model output) must be higher than the base MACO 
+(current year).   
+3. Volume Target:  The target volume (model output) should not decrease by more than 1% or 
+increase by more than 5% compared to the base volume (current year).  
+4. Total Price Increase (PINC):  The overall portfolio price increase can be between 0 -6%, 
+based on a user -defined input.  
+5. Market Share:  ABI's market share should not drop by more than 0.5%.  
+6. Pricing Multiples:  All recommended price changes must be in multiples of 50.  
+ 
+You must also consider soft constraints  to maintain brand hierarchy:  
+• The Net Revenue per Hectoliter (NR/HL) of different segments must follow the 
+established hierarchy: Value < Core < Core+ < Premium < Super Premium.  
+• The NR/HL architecture of size groups must follow the hierarchy: Small > Regular > 
+Large.  
+▪ Small: An SKU is considered small if the pack_size is less than 300.  
+▪ Regular: An SKU is considered regular if its pack_type is 'CAN' and its 
+pack_size is between 300 and 399 (inclusive), or if its pack_type is 'RB' or 
+'NRB' and its pack_size is between 300 and 599 (inclusive).  
+▪ Large: An SKU is considered large if its pack_type is 'CAN' and its 
+pack_size is greater than 399, or if its pack_type is 'RB' or 'NRB' and its 
+pack_size is greater than 599.  
+ 
+LTE: 
+Optimize Marketing Investments  
+ Leverage the model to optimize marketing investments  that can control Power. Give insights to 
+recommend the optimal mix of investment s for maximizing long -term brand equity.  
+• The goal for optimization is to drive power growth using the best marketing allocations  
+• Constraints:  
+o Digital cannot be 100%  
+o TV cannot be more than 50% of the total mix  
+• Evaluation: Power uplift w.r.t. actual power  
+ 
+Simulate Power based on the marketing KPIs  
+Develop an interactive simulator tool based on the above optimized mix where users can adjust 
+marketing inputs and instantly see the projected impact on Brand Power.  
+Use the unmasked data provided to get closer to the insights  
+Submission Guideline s: 
+To ensure you qualify for AI scoring :  
+• The web app development should be within given Github repo that includes a single 
+entrpoint file which can spin up the app locally across Windows/Linux/MAC Platforms  
+o Examples:  
+▪ main.py (for Streamlit/FastAPI/Flask apps) → python main.py  
+▪ npm start (for Node.js/React apps)  
+▪ docker-compose up (for multi -service setup)  
+• No manual setup should be required apart from installing dependencies (e.g., pip install -r 
+requirements.txt, npm install, or Docker).  
+o Judges should not have to configure environment variables, databases, or edit code.  
+o If special setup is needed, include it in the entrypoint or clearly document in 
+README.md . 
+Evaluation Criteria : 
+o Round 1 gives 40 points.  Leaderboard position  is prorated by fixing team 1 points as 40.  
+(provided you qualified  the code check ) 
+• AI Scoring (15 points): 
+o All submissions will be scored by an AI model, based on code quality, structure, 
+documentation, and testing practices . 
+o Evaluation will focus on whether the web app can be reliably executed from a single 
+entrypoint, with clear instructions and organized code in the GitHub repository  
+o Default branch (main) will be selected for the code quality evaluation  
+o You can clean up the code base from Round 1 further provided – your methodology,  
+final scoring equation remains the same and we are able to reproduce the final 
+submission  file. There will be penalty for violations  
+• Methodology + E2E Approach  (15 points – by judges) : 
+o Present the end to end steps involved in  R1 & R2. No need to create ppt s specifically  
+o This can be done through  mkdoc - md files as well  (set up guide included ) - Anija  
+Focus on talking through the below in the methodology walk through(plus additional details 
+as per your wish) : 
+ 
+General:  
+1. What are the final equation s? What are the packages /algorithms  used? 
+2. How was Gen AI leveraged ? 
+3. What are  the key hypothesis /assumptions  taken from a business POV?  
+4. If you had more time/data, what enhancements would you build?  
+ 
+RGM  
+5. How did you ensure volume & price relationship  via elasticity model ? How did you 
+ensure that the model learns from the own and cross price effects of prices for volume 
+prediction?  
+6. Explain with the example of the largest volume SKU  in the market , its cannibalization 
+rate and the sourcing matrix (ie for a 1% price increase in the SKU, which  other SKus will 
+be cannibalizing its volume – across both ABI and non -ABI SKUs ) using the output from 
+your model in R1.  
+7. How did you ensure that SKUs have higher cross elasticities with other SKUs that are 
+similar in terms of same brand, pack and size ? 
+8. How did you use the elasticity model in the optimization?  
+9. Explain your objective function  and plot it? Which optimization technique was used and 
+why? How did you incorporate the constraints ?  
+10. How have you incorporated the soft constraints?  
+11. What is the portfolio change? Are there any patterns  in PINCS across SKUs? What are 
+the SKUs that are driving more profitability , and why? 
+ 
+ 
+ 
+ 
+ 
+ 
+LTE- 
+12. How did you capture long term impact of marketing KPIs ? 
+13. How long it takes to drive power through marketing investments. (eg.  1 year, 3 years, 
+etc.)? 
+14. Which KPIs had short term vs long term impact on power ? 
+15. Did you notice any interaction between KPIs ? 
+16. How do you rationalize the optimized investments to drive power. (Eg.  Any constraints 
+that you considered)?  
+ 
+ 
+o Webapp functionality ( 15 points – by judges) :  
+Core features adherence + functionalities + live dem o, Simulator/ Optimizer  performance  – Anija  
+Core Features:  
+LTE:  
+• Filters to select country, brand, and time period  (monthly, quarterly, etc.) - even if 
+monthly, it should use the R1 model aggregation to roll up to quarterly and show quarterly 
+results 
+• Dropdown or search functionality for each.  
+• List all marketing KPIs (X variables)  used in the model . Users can adjust each KPI  via:  
+o Numeric input box (e.g., type exact value)  
+o Slider (for incremental changes, e.g., ±20% of baseline)  
+• Display the predicted power value  based on current KPI settings.  
+• Ability to save multiple scenarios  for the same country -brand-period combination.  
+• Compare predicted power across scenarios (e.g., table or chart).  
+• Highlight delta from baseline  (current predicted power vs. scenario).  
+• Reset button  to restore baseline KPI values.  
+• Export functionality:  CSV or Excel of scenario inputs + predicted power.  
+• Responsive UI : usable on both desktop and laptop screens.  
+ 
+RGM:  
+• A web app  which can take Revenue Managers inputs for Price Increase (PINC)  & Price 
+Bounds [MIN and MAX eg PTC - 300, PTC + 500] and uses the optimization engine in the 
+backend to recommend the optimal price/SKU .  
+• Functionality – Take user input on PINC and Price Bound > Optimize for MACO > 
+recommend optimal price/SKU adhering to constraints  
+Output:  
+o Dynamic visualization of the overall Portfolio Impact and Financial summary . This 
+table should clearly show – for the given user input; the old price, new price, and the 
+projected impact (%change)  on key performance indicators (KPIs), including:  
+• Volume  
+• Net Revenue (NR)  
+• NR per Hectoliter (NR/HL)  
+• MACO  
+• MACO per Hectoliter (MACO/HL)  
+o Price Architecture  View - A visualization of the new and old prices across SKUs 
+based on the recommendations from the optimizer for the user defined PINC, that 
+can be viewed by product attributes like brand, pack, size .  
+ 
+ 
+Business users  (15 points by Judges): 
+End output appeal to business users  (Relevance,  Hypothesis & Assumptions, E ase of use,  
+differentiation,  presentation)  
+Bonus Points (10 points  by Judges ): Judges discretion  for anything outstanding,  chatbot 
+integration  
+ 
+Timelines:  
+Git Repo Submission Deadline: 9th Oct 12 AM GMT /5.30 AM IST  
+Round 2 for RGM: 9th Oct 6.30 PM – 9.30 PM IST/1PM -4PM GMT (You will have a total of 15 minutes 
+to present & 10 minutes for questions per team)  
+Round 2 for LTE:  10th Oct 6.30 PM – 9.30 PM IST/1PM -4PM GMT( You will have a total of 15 minutes to 
+present & 10 minutes for questions per team)  
+ 
