@@ -706,7 +706,7 @@ kpi_cards = f"""
 """
 st.markdown(kpi_cards, unsafe_allow_html=True)
 
-st.dataframe(portfolio_display, width="stretch", hide_index=True)
+st.dataframe(portfolio_display, hide_index=True, use_container_width=True)
 
 tab_recos, tab_mapping = st.tabs(["SKU Recommendations", "Sell-in / Sell-out Mapping"])
 
@@ -751,7 +751,7 @@ with tab_recos:
     filtered["price_delta"] = filtered["price_new"] - filtered["price_base"]
 
     styled = filtered.style.applymap(price_delta_color, subset=["price_delta"])
-    st.dataframe(styled, width="stretch", hide_index=True)
+    st.dataframe(styled, hide_index=True, use_container_width=True)
 
     download_cols = st.columns(3)
     download_cols[0].download_button(
@@ -855,12 +855,12 @@ with tab_recos:
         st.caption("NR/HL by Segment")
         segment_df = pd.DataFrame([constraints.get("segment_nr_hl", {})]).T.reset_index()
         segment_df.columns = ["segment", "nr_per_hl"]
-        st.dataframe(segment_df, hide_index=True, width="stretch")
+        st.dataframe(segment_df, hide_index=True, use_container_width=True)
     with right:
         st.caption("NR/HL by Size Group")
         size_df = pd.DataFrame([constraints.get("size_group_nr_hl", {})]).T.reset_index()
         size_df.columns = ["size_group", "nr_per_hl"]
-        st.dataframe(size_df, hide_index=True, width="stretch")
+        st.dataframe(size_df, hide_index=True, use_container_width=True)
         st.caption("Hierarchy check: Value < Core < Premium and Small > Regular > Large.")
 
     st.markdown("### Scenario Workspace")
@@ -896,7 +896,7 @@ with tab_mapping:
         st.caption(
             "Slugified brand, pack, and size tokens bridge Sell-out SKUs to Sell-in keys. Sample below (first 500 rows)."
         )
-        st.dataframe(mapping_df.head(500), width="stretch", hide_index=True)
+        st.dataframe(mapping_df.head(500), hide_index=True, use_container_width=True)
         st.download_button(
             "Download full mapping",
             data=df_to_csv_bytes(mapping_df),
