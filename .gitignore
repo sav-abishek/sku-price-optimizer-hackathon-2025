@@ -217,3 +217,12 @@ notebooks/.ipynb_checkpoints/
 
 # Streamlit cache
 .streamlit/
+
+
+scripts/
+share/
+site-packages/
+
+*.zip
+*.exe
+*.cfg
