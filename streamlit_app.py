@@ -178,6 +178,44 @@ st.markdown(
         .kpi-card .delta span {{
             font-weight: 600;
         }}
+        .kpi-card.guardrail {{
+            position: relative;
+            border-width: 1.5px;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }}
+        .kpi-card.guardrail.pass {{
+            background: linear-gradient(135deg, rgba(63, 191, 119, 0.14), #ffffff);
+            border-color: rgba(28, 142, 92, 0.45);
+        }}
+        .kpi-card.guardrail.fail {{
+            background: linear-gradient(135deg, rgba(255, 186, 120, 0.22), #ffffff);
+            border-color: rgba(197, 98, 10, 0.45);
+        }}
+        .kpi-card.guardrail.fail .value {{
+            color: #b34100;
+        }}
+        .guardrail-header {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.35rem;
+        }}
+        .guardrail-status {{
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            border-radius: 999px;
+            padding: 0.15rem 0.55rem;
+            font-weight: 700;
+        }}
+        .guardrail-status.pass {{
+            background: rgba(19, 153, 97, 0.12);
+            color: #14724d;
+        }}
+        .guardrail-status.fail {{
+            background: rgba(217, 102, 36, 0.16);
+            color: #a34800;
+        }}
         .stMarkdown h2, .stMarkdown h3 {{
             color: var(--brand-black) !important;
         }}
@@ -799,6 +837,7 @@ with tab_recos:
         f"<h3 style='color:{BRAND_COLORS['black']};margin-top:2.5rem;'>Guardrails</h3>",
         unsafe_allow_html=True,
     )
+    st.caption("Green cards meet the guardrails; amber cards call out constraints that were broken.")
 
     maco_delta = float(constraints.get("maco_delta", 0.0))
     volume_ratio = float(constraints.get("volume_ratio", 1.0))
@@ -808,48 +847,66 @@ with tab_recos:
     pinc_actual_guard = float(constraints.get("pinc_actual", metadata.get("pinc_actual", 0.0)))
     base_share = float(metadata.get("base_market_share", 0.0))
 
-    guardrail_cards = f"""
-    <div class="kpi-row" style="margin-top:0.5rem;">
-        <div class="kpi-card">
-            <h4>MACO Delta</h4>
-            <div class="value">{billions(maco_delta)}</div>
-            <div class="delta">Must be non-negative</div>
-        </div>
-        <div class="kpi-card">
-            <h4>ABI Volume</h4>
-            <div class="value">{volume_ratio:.2%}</div>
-            <div class="delta">Guardrail: -1% to +5%</div>
-        </div>
-        <div class="kpi-card">
-            <h4>Industry Volume</h4>
-            <div class="value">{industry_ratio:.2%}</div>
-            <div class="delta">Guardrail: â‰¥ 99%</div>
-        </div>
-        <div class="kpi-card">
-            <h4>Market Share</h4>
-            <div class="value">{market_share_actual:.2%}</div>
-            <div class="delta">Baseline {base_share:.2%}</div>
-        </div>
-    </div>
-    """
+    abi_min, abi_max = 0.99, 1.05
+    industry_cap = 0.99
+    share_drop_limit = 0.005
+
+    guardrails = [
+        {
+            "title": "MACO Delta",
+            "value": billions(maco_delta),
+            "detail": "Must be >= 0",
+            "status": maco_delta >= 0,
+        },
+        {
+            "title": "ABI Volume",
+            "value": f"{volume_ratio:.2%}",
+            "detail": "Guardrail: -1% to +5%",
+            "status": abi_min <= volume_ratio <= abi_max,
+        },
+        {
+            "title": "Industry Volume",
+            "value": f"{industry_ratio:.2%}",
+            "detail": "Guardrail: <= 99%",
+            "status": industry_ratio <= industry_cap,
+        },
+        {
+            "title": "Market Share",
+            "value": f"{market_share_actual:.2%}",
+            "detail": f"Baseline {base_share:.2%}",
+            "status": market_share_actual >= base_share,
+        },
+        {
+            "title": "Share Drop vs. Base",
+            "value": f"{share_drop:.2%}",
+            "detail": "Drop must be <= 0.5pp",
+            "status": share_drop <= share_drop_limit,
+        },
+        {
+            "title": "Portfolio PINC",
+            "value": f"{pinc_actual_guard:.3%}",
+            "detail": f"Target {pinc:.3%}",
+            "status": pinc_actual_guard >= pinc,
+        },
+    ]
+
+    guardrail_cards = '<div class="kpi-row" style="margin-top:0.5rem;">'
+    for guardrail in guardrails:
+        status_class = "pass" if guardrail["status"] else "fail"
+        status_label = "On track" if guardrail["status"] else "Needs action"
+        guardrail_cards += (
+            f'\n<div class="kpi-card guardrail {status_class}">'
+            f'<div class="guardrail-header">'
+            f'<h4>{guardrail["title"]}</h4>'
+            f'<span class="guardrail-status {status_class}">{status_label}</span>'
+            f"</div>"
+            f'<div class="value">{guardrail["value"]}</div>'
+            f'<div class="delta">{guardrail["detail"]}</div>'
+            "</div>"
+        )
+    guardrail_cards += "\n</div>"
     st.markdown(guardrail_cards, unsafe_allow_html=True)
-
-    secondary_guardrail_cards = f"""
-    <div class="kpi-row" style="margin-top:0.5rem;">
-        <div class="kpi-card">
-            <h4>Share Drop vs. Base</h4>
-            <div class="value">{share_drop:.2%}</div>
-            <div class="delta">Guardrail: â‰¤ 0.5%</div>
-        </div>
-        <div class="kpi-card">
-            <h4>Portfolio PINC</h4>
-            <div class="value">{pinc_actual_guard:.3%}</div>
-            <div class="delta">Target {pinc:.3%}</div>
-        </div>
-    </div>
-    """
-    st.markdown(secondary_guardrail_cards, unsafe_allow_html=True)
-
+
     left, right = st.columns(2)
     with left:
         st.caption("NR/HL by Segment")
