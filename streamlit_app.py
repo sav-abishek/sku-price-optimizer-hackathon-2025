@@ -910,7 +910,9 @@ with tab_recos:
         f"<h3 style='color:{BRAND_COLORS['black']};margin-top:2.5rem;'>Guardrails</h3>",
         unsafe_allow_html=True,
     )
-    st.caption("Green cards meet the guardrails; amber cards call out constraints that were broken.")
+    st.caption(
+        "All guardrails are hard constraints (green = satisfied) except Portfolio PINC, which may flex to absorb trade-offs."
+    )
 
     maco_delta = float(constraints.get("maco_delta", 0.0))
     volume_ratio = float(constraints.get("volume_ratio", 1.0))
@@ -926,40 +928,40 @@ with tab_recos:
 
     guardrails = [
         {
-            "title": "MACO Delta",
+            "title": "Financial Target (MACO)",
             "value": billions(maco_delta),
-            "detail": "Must be >= 0",
+            "detail": "Total MACO ≥ base (profit cannot decline).",
             "status": maco_delta >= 0,
         },
         {
-            "title": "ABI Volume",
+            "title": "ABI Volume Target",
             "value": f"{volume_ratio:.2%}",
-            "detail": "Guardrail: -1% to +5%",
+            "detail": "ABI volume must stay within -1% to +5% of base.",
             "status": abi_min <= volume_ratio <= abi_max,
         },
         {
-            "title": "Industry Volume",
+            "title": "Industry Volume Tether",
             "value": f"{industry_ratio:.2%}",
-            "detail": "Guardrail: <= 99%",
-            "status": industry_ratio <= industry_cap,
+            "detail": "Industry volume ≥ 99% of base (≤1% drop).",
+            "status": industry_ratio >= industry_cap,
         },
         {
-            "title": "Market Share",
+            "title": "Market Share Preservation",
             "value": f"{market_share_actual:.2%}",
-            "detail": f"Baseline {base_share:.2%}",
+            "detail": f"Share loss capped at 0.5pp (base {base_share:.2%}).",
             "status": market_share_actual >= base_share,
         },
         {
-            "title": "Share Drop vs. Base",
+            "title": "Market Share Loss",
             "value": f"{share_drop:.2%}",
-            "detail": "Drop must be <= 0.5pp",
+            "detail": "Share drop must be ≤ 0.5pp.",
             "status": share_drop <= share_drop_limit,
         },
         {
             "title": "Portfolio PINC",
             "value": f"{pinc_actual_guard:.3%}",
-            "detail": f"Target {pinc:.3%}",
-            "status": pinc_actual_guard >= pinc,
+            "detail": f"Target {pinc:.3%} .",
+            "status": pinc_actual_guard == pinc,
         },
     ]
 
@@ -979,7 +981,8 @@ with tab_recos:
         )
     guardrail_cards += "\n</div>"
     st.markdown(guardrail_cards, unsafe_allow_html=True)
-
+
+
     segment_df = pd.DataFrame([constraints.get("segment_nr_hl", {})]).T.reset_index()
     if not segment_df.empty:
         segment_df.columns = ["segment", "nr_per_hl"]
