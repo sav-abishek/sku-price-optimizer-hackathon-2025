@@ -1,7 +1,7 @@
 ﻿import io
 import sys
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 import plotly.express as px
@@ -151,6 +151,14 @@ st.markdown(
             gap: 1.1rem;
             margin: 0.25rem 0 0.55rem 0;
         }}
+        .kpi-row.guardrail-grid {{
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }}
+        @media (max-width: 980px) {{
+            .kpi-row.guardrail-grid {{
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            }}
+        }}
         .kpi-card {{
             background: #ffffff;
             border-radius: 18px;
@@ -297,16 +305,16 @@ st.markdown(
             font-weight: 600;
             min-width: 280px;
         }}
-        .loading-card .loading-spinner {{
-            width: 48px;
-            height: 48px;
-            border: 4px solid rgba(255, 255, 255, 0.25);
-            border-top-color: #f5e003;
+        .loading-card .spinner {{
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
-            margin: 0 auto 0.75rem auto;
-            animation: loading-spin 0.8s linear infinite;
+            border: 5px solid rgba(255, 255, 255, 0.2);
+            border-top-color: #f5e003;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 0.9rem auto;
         }}
-        @keyframes loading-spin {{
+        @keyframes spin {{
             to {{ transform: rotate(360deg); }}
         }}
         .section-header {{
@@ -629,7 +637,7 @@ def billions(value: float) -> str:
 def growth_badge(delta: float) -> str:
     color = '#1b7a1b' if delta >= 0 else '#c0392b'
     symbol = '+ ' if delta >= 0 else '- '
-    return f"<span style='color:{color};'>{symbol}{abs(delta):.2%}</span>"
+    return f"<span style='color:{color};font-weight:700;'>{symbol}{abs(delta):.2%}</span>"
 
 
 def sorted_unique(series: pd.Series) -> List[str]:
@@ -680,6 +688,32 @@ def dropdown_multiselect(label: str, options: List[str]) -> List[str]:
     return st.session_state[selection_key]
 
 
+def compute_portfolio_pinc(df: pd.DataFrame) -> float:
+    required_cols = {"price_base", "price_new", "volume_base"}
+    if not required_cols.issubset(df.columns):
+        return 0.0
+    base_weight = (df["price_base"] * df["volume_base"]).sum()
+    new_weight = (df["price_new"] * df["volume_base"]).sum()
+    if base_weight == 0:
+        return 0.0
+    return (new_weight / base_weight) - 1.0
+
+
+def metric_pair(df: pd.DataFrame, metric_name: str) -> Tuple[float, float]:
+    subset = df.loc[df["metric"] == metric_name]
+    if subset.empty:
+        return 0.0, 0.0
+    new_val = float(subset["new"].iloc[0])
+    base_val = float(subset["base"].iloc[0])
+    return new_val, base_val
+
+
+def format_volume(value: float) -> str:
+    if abs(value) >= 1e6:
+        return f"{value / 1e6:,.2f} M HL"
+    return f"{value:,.0f} HL"
+
+
 def price_delta_color(value: float) -> str:
     if value > 0:
         return "background-color: #e6f5e6; color: #1b7a1b; font-weight:600;"
@@ -717,7 +751,7 @@ st.markdown(
 LOADING_OVERLAY_HTML = """
 <div class="loading-overlay">
     <div class="loading-card">
-        <div class="loading-spinner"></div>
+        <div class="spinner"></div>
         <div>Brewing your optimal pricing...</div>
     </div>
 </div>
@@ -759,8 +793,14 @@ result = st.session_state["current_result"]
 summary_df: pd.DataFrame = result["summary"].copy()
 portfolio_df: pd.DataFrame = result["portfolio"].copy()
 architecture_df: pd.DataFrame = result["architecture"].copy()
-metadata = result["metadata"]
-constraints = result.get("constraints", {})
+metadata = dict(result["metadata"])
+constraints = dict(result.get("constraints", {}))
+result["metadata"] = metadata
+result["constraints"] = constraints
+
+pinc_actual_value = compute_portfolio_pinc(summary_df)
+metadata["pinc_actual"] = pinc_actual_value
+constraints.setdefault("pinc_actual", pinc_actual_value)
 
 render_insights_assistant()
 
@@ -784,34 +824,32 @@ if {"base", "new"}.issubset(portfolio_display.columns):
     except Exception:
         pass
 
-maco_new = portfolio_df.loc[portfolio_df["metric"] == "MACO", "new"].iloc[0]
-nr_new = portfolio_df.loc[portfolio_df["metric"] == "Net Revenue", "new"].iloc[0]
-maco_base = portfolio_df.loc[portfolio_df["metric"] == "MACO", "base"].iloc[0]
-nr_base = portfolio_df.loc[portfolio_df["metric"] == "Net Revenue", "base"].iloc[0]
-pinc_actual = metadata.get("pinc_actual", 0)
-iterations = metadata.get("iterations")
+maco_new, maco_base = metric_pair(portfolio_df, "MACO")
+volume_new, volume_base = metric_pair(portfolio_df, "Volume (HL)")
+nrhl_new, nrhl_base = metric_pair(portfolio_df, "NR/HL")
+share_new, share_base = metric_pair(portfolio_df, "Market Share")
 
 kpi_cards = f"""
 <div class="kpi-row">
     <div class="kpi-card">
         <h4>MACO</h4>
         <div class="value">{billions(maco_new)}</div>
-        <div class="delta">Baseline {billions(maco_base)} &nbsp; {growth_badge((maco_new - maco_base) / max(maco_base, 1e-6))}</div>
+        <div class="delta">{growth_badge((maco_new - maco_base) / max(maco_base, 1e-6))}&nbsp;vs baseline</div>
     </div>
     <div class="kpi-card">
-        <h4>Net Revenue</h4>
-        <div class="value">{billions(nr_new)}</div>
-        <div class="delta">Baseline {billions(nr_base)} &nbsp; {growth_badge((nr_new - nr_base) / max(nr_base, 1e-6))}</div>
+        <h4>Volume</h4>
+        <div class="value">{format_volume(volume_new)}</div>
+        <div class="delta">{growth_badge((volume_new - volume_base) / max(volume_base, 1e-6))}&nbsp;vs baseline</div>
     </div>
     <div class="kpi-card">
-        <h4>Portfolio PINC</h4>
-        <div class="value">{pinc_actual:.3%}</div>
-        <div class="delta">Target {pinc:.3%}</div>
+        <h4>NR/HL</h4>
+        <div class="value">{nrhl_new:,.0f}</div>
+        <div class="delta">{growth_badge((nrhl_new - nrhl_base) / max(nrhl_base, 1e-6))}&nbsp;vs baseline</div>
     </div>
     <div class="kpi-card">
-        <h4>Solver Iterations</h4>
-        <div class="value">{iterations if iterations is not None else '-'}</div>
-        <div class="delta">Post-constraint scaling</div>
+        <h4>Market Share</h4>
+        <div class="value">{share_new:.2%}</div>
+        <div class="delta">{growth_badge((share_new - share_base) / max(share_base, 1e-6))}&nbsp;vs baseline</div>
     </div>
 </div>
 """
@@ -910,27 +948,34 @@ with tab_recos:
         f"<h3 style='color:{BRAND_COLORS['black']};margin-top:2.5rem;'>Guardrails</h3>",
         unsafe_allow_html=True,
     )
-    st.caption(
-        "All guardrails are hard constraints (green = satisfied) except Portfolio PINC, which may flex to absorb trade-offs."
+
+    st.markdown(
+        f"<p style='color:{BRAND_COLORS['black']};margin-top:0.5rem;'>All guardrails are hard constraints (green = satisfied) except Portfolio PINC, which may flex to absorb trade-offs</p>",
+        unsafe_allow_html=True,
     )
+    # st.caption(
+    #     "All guardrails are hard constraints (green = satisfied) except Portfolio PINC, which may flex to absorb trade-offs."
+    # )
 
     maco_delta = float(constraints.get("maco_delta", 0.0))
     volume_ratio = float(constraints.get("volume_ratio", 1.0))
     industry_ratio = float(constraints.get("industry_ratio", 1.0))
     market_share_actual = float(constraints.get("market_share", metadata.get("base_market_share", 0.0)))
     share_drop = float(constraints.get("share_drop", 0.0))
-    pinc_actual_guard = float(constraints.get("pinc_actual", metadata.get("pinc_actual", 0.0)))
+    pinc_actual_guard = float(metadata.get("pinc_actual", 0.0))
     base_share = float(metadata.get("base_market_share", 0.0))
 
     abi_min, abi_max = 0.99, 1.05
     industry_cap = 0.99
     share_drop_limit = 0.005
 
+    pinc_guard_tolerance = 0.0005
+
     guardrails = [
         {
             "title": "Financial Target (MACO)",
             "value": billions(maco_delta),
-            "detail": "Total MACO ≥ base (profit cannot decline).",
+            "detail": "Total MACO must stay at or above base.",
             "status": maco_delta >= 0,
         },
         {
@@ -942,30 +987,30 @@ with tab_recos:
         {
             "title": "Industry Volume Tether",
             "value": f"{industry_ratio:.2%}",
-            "detail": "Industry volume ≥ 99% of base (≤1% drop).",
+            "detail": "Industry volume must remain ≥ 99% of base (≤1% drop).",
             "status": industry_ratio >= industry_cap,
         },
         {
             "title": "Market Share Preservation",
             "value": f"{market_share_actual:.2%}",
-            "detail": f"Share loss capped at 0.5pp (base {base_share:.2%}).",
+            "detail": f"Baseline: {base_share:.2%}",
             "status": market_share_actual >= base_share,
         },
         {
             "title": "Market Share Loss",
             "value": f"{share_drop:.2%}",
-            "detail": "Share drop must be ≤ 0.5pp.",
+            "detail": "Share drop must be ≤ 0.5%.",
             "status": share_drop <= share_drop_limit,
         },
         {
             "title": "Portfolio PINC",
             "value": f"{pinc_actual_guard:.3%}",
-            "detail": f"Target {pinc:.3%} .",
-            "status": pinc_actual_guard == pinc,
+            "detail": f"Actual {pinc_actual_guard:.3%} vs. target {pinc:.3%} within ±{pinc_guard_tolerance:.3%}.",
+            "status": abs(pinc_actual_guard - pinc) <= pinc_guard_tolerance,
         },
     ]
 
-    guardrail_cards = '<div class="kpi-row" style="margin-top:0.5rem;">'
+    guardrail_cards = '<div class="kpi-row guardrail-grid" style="margin-top:0.5rem;">'
     for guardrail in guardrails:
         status_class = "pass" if guardrail["status"] else "fail"
         status_label = "On track" if guardrail["status"] else "Needs action"
