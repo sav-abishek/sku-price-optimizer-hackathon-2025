@@ -1,10 +1,11 @@
 ﻿import io
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 PROJECT_SRC = Path(__file__).resolve().parent / "src"
@@ -255,6 +256,58 @@ st.markdown(
             color: var(--brand-black);
             border-color: rgba(229, 182, 17, 0.4);
             box-shadow: 0 6px 18px rgba(229, 182, 17, 0.35);
+        }}
+        .nrhl-label {{
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #000000;
+            margin-bottom: 0.4rem;
+        }}
+        .nrhl-note {{
+            color: #000000;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }}
+        .kpi-card.guardrail.hierarchy h4,
+        .kpi-card.guardrail.hierarchy .value,
+        .kpi-card.guardrail.hierarchy .delta {{
+            color: #000000;
+        }}
+        .loading-overlay {{
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(3px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }}
+        .loading-card {{
+            background: #111111;
+            color: #ffffff;
+            padding: 1.5rem 2.5rem;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+            font-size: 1.1rem;
+            letter-spacing: 0.03em;
+            font-weight: 600;
+            min-width: 280px;
+        }}
+        .loading-card .loading-spinner {{
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(255, 255, 255, 0.25);
+            border-top-color: #f5e003;
+            border-radius: 50%;
+            margin: 0 auto 0.75rem auto;
+            animation: loading-spin 0.8s linear infinite;
+        }}
+        @keyframes loading-spin {{
+            to {{ transform: rotate(360deg); }}
         }}
         .section-header {{
             font-size: 1.9rem;
@@ -660,6 +713,15 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+LOADING_OVERLAY_HTML = """
+<div class="loading-overlay">
+    <div class="loading-card">
+        <div class="loading-spinner"></div>
+        <div>Brewing your optimal pricing...</div>
+    </div>
+</div>
+"""
 st.markdown("")
 
 with st.sidebar:
@@ -676,11 +738,22 @@ with st.sidebar:
     price_step = st.number_input(
         "Price step (multiples of)", value=50.0, min_value=1.0, step=1.0, help="Rounded PTC increments"
     )
-    run_clicked = st.button("Run Optimization")
+    run_clicked = st.button("Run Optimization", type="primary")
 
-if "current_result" not in st.session_state or run_clicked:
-    with st.spinner("Running optimizer..."):
+if "current_result" not in st.session_state:
+    st.session_state["current_result"] = None
+
+loader_placeholder = st.empty()
+
+if run_clicked:
+    loader_placeholder.markdown(LOADING_OVERLAY_HTML, unsafe_allow_html=True)
+    with st.spinner("Brewing your optimal pricing..."):
         st.session_state["current_result"] = cached_optimize(pinc, floor_delta, ceiling_delta, price_step)
+    loader_placeholder.empty()
+
+if st.session_state["current_result"] is None:
+    st.info("Set your guardrails, then click Run Optimization to brew a scenario.")
+    st.stop()
 
 result = st.session_state["current_result"]
 summary_df: pd.DataFrame = result["summary"].copy()
@@ -907,18 +980,112 @@ with tab_recos:
     guardrail_cards += "\n</div>"
     st.markdown(guardrail_cards, unsafe_allow_html=True)
 
+    segment_df = pd.DataFrame([constraints.get("segment_nr_hl", {})]).T.reset_index()
+    if not segment_df.empty:
+        segment_df.columns = ["segment", "nr_per_hl"]
+        segment_df["segment"] = segment_df["segment"].astype(str)
+        segment_df["nr_per_hl"] = pd.to_numeric(segment_df["nr_per_hl"], errors="coerce")
+    size_df = pd.DataFrame([constraints.get("size_group_nr_hl", {})]).T.reset_index()
+    if not size_df.empty:
+        size_df.columns = ["size_group", "nr_per_hl"]
+        size_df["size_group"] = size_df["size_group"].astype(str)
+        size_df["nr_per_hl"] = pd.to_numeric(size_df["nr_per_hl"], errors="coerce")
+
+    segment_share_df = pd.DataFrame()
+    size_share_df = pd.DataFrame()
+
     left, right = st.columns(2)
     with left:
-        st.caption("NR/HL by Segment")
-        segment_df = pd.DataFrame([constraints.get("segment_nr_hl", {})]).T.reset_index()
-        segment_df.columns = ["segment", "nr_per_hl"]
-        st.dataframe(segment_df, hide_index=True, use_container_width=True)
+        st.markdown("<div class='nrhl-label'>NR/HL by Segment</div>", unsafe_allow_html=True)
+        if segment_df.empty:
+            st.markdown("<div class='nrhl-note'>Segment NR/HL not available.</div>", unsafe_allow_html=True)
+        else:
+            st.dataframe(segment_df, hide_index=True, use_container_width=True)
+            share_df = segment_df.dropna(subset=["nr_per_hl"]).copy()
+            total_nr = share_df["nr_per_hl"].sum()
+            if total_nr > 0 and not share_df.empty:
+                share_df["nr_per_hl_pct"] = share_df["nr_per_hl"] / total_nr
+                segment_share_df = share_df
     with right:
-        st.caption("NR/HL by Size Group")
-        size_df = pd.DataFrame([constraints.get("size_group_nr_hl", {})]).T.reset_index()
-        size_df.columns = ["size_group", "nr_per_hl"]
-        st.dataframe(size_df, hide_index=True, use_container_width=True)
-        st.caption("Hierarchy check: Value < Core < Premium and Small > Regular > Large.")
+        st.markdown("<div class='nrhl-label'>NR/HL by Size Group</div>", unsafe_allow_html=True)
+        if size_df.empty:
+            st.markdown("<div class='nrhl-note'>Size group NR/HL not available.</div>", unsafe_allow_html=True)
+        else:
+            st.dataframe(size_df, hide_index=True, use_container_width=True)
+            share_df = size_df.dropna(subset=["nr_per_hl"]).copy()
+            total_nr = share_df["nr_per_hl"].sum()
+            if total_nr > 0 and not share_df.empty:
+                share_df["nr_per_hl_pct"] = share_df["nr_per_hl"] / total_nr
+                size_share_df = share_df
+
+
+    def lookup_metric(df: pd.DataFrame, key_col: str, key: str) -> Union[float, None]:
+        if df.empty:
+            return None
+        mask = df[key_col].str.lower() == key
+        if not mask.any():
+            return None
+        value = df.loc[mask, "nr_per_hl"].iloc[0]
+        try:
+            return float(value)
+        except Exception:
+            return None
+
+    hierarchy_checks = []
+
+    seg_value = lookup_metric(segment_df, "segment", "value")
+    seg_core = lookup_metric(segment_df, "segment", "core")
+    seg_premium = lookup_metric(segment_df, "segment", "premium")
+    if all(v is not None for v in [seg_value, seg_core, seg_premium]):
+        seg_status = (seg_value < seg_core) and (seg_core < seg_premium)
+        hierarchy_checks.append(
+            {
+                "title": "Value < Core < Premium",
+                "status": seg_status,
+            }
+        )
+    elif not segment_df.empty:
+        hierarchy_checks.append(
+            {
+                "title": "Value < Core < Premium",
+                "status": False,
+            }
+        )
+
+    size_small = lookup_metric(size_df, "size_group", "small")
+    size_regular = lookup_metric(size_df, "size_group", "regular")
+    size_large = lookup_metric(size_df, "size_group", "large")
+    if all(v is not None for v in [size_small, size_regular, size_large]):
+        size_status = (size_small > size_regular) and (size_regular > size_large)
+        hierarchy_checks.append(
+            {
+                "title": "Small > Regular > Large",
+                "status": size_status,
+            }
+        )
+    elif not size_df.empty:
+        hierarchy_checks.append(
+            {
+                "title": "Small > Regular > Large",
+                "status": False,
+            }
+        )
+
+    if hierarchy_checks:
+        hierarchy_cards = '<div class="kpi-row" style="margin-top:0.75rem;">'
+        for check in hierarchy_checks:
+            status_class = "pass" if check["status"] else "fail"
+            status_label = "On track" if check["status"] else "Needs action"
+            hierarchy_cards += (
+                f'<div class="kpi-card guardrail hierarchy {status_class}">'
+                f"<div class='guardrail-header'>"
+                f"<h4>{check['title']}</h4>"
+                f"<span class='guardrail-status {status_class}'>{status_label}</span>"
+                f"</div>"
+                f"</div>"
+            )
+        hierarchy_cards += "</div>"
+        st.markdown(hierarchy_cards, unsafe_allow_html=True)
 
     st.markdown("### Scenario Workspace")
     scenario_name = st.text_input("Scenario name")
