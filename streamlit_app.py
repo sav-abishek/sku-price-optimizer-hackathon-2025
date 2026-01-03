@@ -773,6 +773,38 @@ with st.sidebar:
         "Price step (multiples of)", value=50.0, min_value=1.0, step=1.0, help="Rounded PTC increments"
     )
     run_clicked = st.button("Run Optimization", type="primary")
+    sidebar_footer = f"""
+    <style>
+      .sidebar-footer {{
+          margin-top: 1.5rem;
+          padding: 0.75rem 0.9rem;
+          border-radius: 16px;
+          border: 1px solid rgba(245, 224, 3, 0.35);
+          background: rgba(245, 224, 3, 0.08);
+          font-size: 0.85rem;
+          line-height: 1.4;
+          box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+      }}
+      .sidebar-footer strong {{
+          color: {BRAND_COLORS["primary"]};
+          letter-spacing: 0.08em;
+      }}
+      .sidebar-footer a {{
+          color: {BRAND_COLORS["primary"]};
+          font-weight: 600;
+          text-decoration: none;
+      }}
+      .sidebar-footer a:hover {{
+          text-decoration: underline;
+      }}
+    </style>
+    <div class="sidebar-footer">
+      <div><strong>Team FooBar</strong></div>
+      <div>Archit Mishra <a href="mailto:Archit.Mishra@Ab-InBev.com">Archit.Mishra@Ab-InBev.com</a></div>
+      <div>Abishek Vinodh <a href="mailto:Abishek.Vinodh@AB-InBev.com">Abishek.Vinodh@AB-InBev.com</a></div>
+    </div>
+    """
+    st.markdown(sidebar_footer, unsafe_allow_html=True)
 
 if "current_result" not in st.session_state:
     st.session_state["current_result"] = None
@@ -1186,6 +1218,50 @@ st.markdown(
     "<code>streamlit run streamlit_app.py</code>.</p>",
     unsafe_allow_html=True,
 )
+
+footer_html = """
+<style>
+  .app-footer {
+      position: sticky;
+      bottom: 0;
+      background: #0e0e0e;
+      color: #f5e003;
+      padding: 0.75rem 1rem;
+      border-radius: 18px 18px 0 0;
+      margin-top: 1.5rem;
+      font-size: 0.92rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.12);
+  }
+  .app-footer span {
+      color: #ffffff;
+  }
+  .app-footer .label {
+      color: #f5e003;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+  }
+  .app-footer a {
+      color: #f5e003;
+      text-decoration: none;
+      font-weight: 600;
+  }
+  .app-footer a:hover {
+      text-decoration: underline;
+  }
+</style>
+<div class="app-footer">
+  <span class="label">Built by Team FooBar</span>
+  <span>Archit Mishra (<a href="mailto:Archit.Mishra@Ab-InBev.com">Archit.Mishra@Ab-InBev.com</a>)</span>
+  <span>Abishek Vinodh (<a href="mailto:Abishek.Vinodh@AB-InBev.com">Abishek.Vinodh@AB-InBev.com</a>)</span>
+</div>
+"""
+st.markdown(footer_html, unsafe_allow_html=True)
 
 
 
