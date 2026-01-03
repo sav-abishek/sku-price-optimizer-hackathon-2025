@@ -2,6 +2,12 @@
 
 End-to-end workspace for the Hackathon 2025 Round 2 submission. The repository reproduces the Round 1 demand models, computes refreshed elasticities from the Sell-in/Sell-out workbooks, and surfaces both a Streamlit UI and a FastAPI service for price-scenario analysis.
 
+## Preview
+![Hackathon Website Preview](https://github.com/user-attachments/assets/f0994990-5c7a-4648-9d4c-f23c62629160)
+![Hackathon Journey 2](https://github.com/user-attachments/assets/f804ece7-7979-456c-beb8-b2c0edd852ba)
+![Hackathon Journey 1](https://github.com/user-attachments/assets/50ac9521-208e-4538-80b9-fb4bfcc835ad)
+
+
 ## Setup Instructions
 
 ### Prerequisites
